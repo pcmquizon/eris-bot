@@ -1,0 +1,40 @@
+{
+  "name": "eris-bot",
+  "version": "0.0.1",
+  "description": "Eris Bot",
+  "main": "server.js",
+  "dependencies": {
+    "body-parser": "^1.14.2",
+    "botbuilder": "^3.2.3",
+    "cognitive-services": "^0.1.0",
+    "express": "^4.13.3",
+    "lodash": "^4.9.0",
+    "morgan": "^1.6.1",
+    "restify": "^4.1.1",
+    "winston": "^2.1.0"
+  },
+  "scripts": {
+    "start": "grunt",
+    "test": "grunt test",
+    "coverage": "unset NODE_ENV && istanbul cover _mocha -- --recursive -R spec -t 5000 -s 100",
+    "test-dev": "grunt test-watch",
+    "docs": "apidoc -i controllers -o apidoc/"
+  },
+  "author": "Jaime & Pia",
+  "devDependencies": {
+    "apidoc": "^0.16.0",
+    "chai": "^3.4.1",
+    "coveralls": "^2.11.9",
+    "grunt": "^1.0.1",
+    "grunt-contrib-jshint": "^1.0.0",
+    "grunt-contrib-watch": "^1.0.0",
+    "grunt-express-server": "^0.5.1",
+    "grunt-mocha-test": "^0.12.7",
+    "istanbul": "^0.4.3",
+    "mocha": "^2.3.3",
+    "mocha-lcov-reporter": "^1.0.0",
+    "node-mocks-http": "^1.5.1",
+    "supertest": "^1.1.0"
+  },
+  "license": "MIT"
+}
