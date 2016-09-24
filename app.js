@@ -4,6 +4,9 @@ Created by: Jaime R. Canicula
 
 Thanks to Pia Carmela Quizon for helping me on the LUIS 
 and the concept of Node.js
+
+References : https://docs.botframework.com/en-us/node/builder/guides/examples/
+           : https://docs.botframework.com/en-us/node/builder/
 */
 var restify = require('restify');
 var builder = require('botbuilder');
@@ -40,8 +43,6 @@ bot.dialog('/', intents);
 intents.matches('createtasks', [
 
     function(session,args,next,req,res){
-
-
         /*Initialize the user session*/
         session.userData.newConversation = "initialized";
 
@@ -70,9 +71,6 @@ intents.matches('createtasks', [
     },
     function (session, results,next,res,req) {
        
-
-        session.send(session.userData.entities + ' like');
-
         /*Just for the prompting*/
 
         if(!session.userData.taskName){
@@ -91,11 +89,11 @@ intents.matches('createtasks', [
 
     function(session,args,next){
 
-        var recipient = builder.EntityRecognizer.findEntity(session.userData.entities,'scheduletype');
+        var scheduletype = builder.EntityRecognizer.findEntity(session.userData.entities,'scheduletype');
 
-        if(recipient){
+        if(scheduletype){
             // session.send("Got Task Type");
-            session.userData.taskType = recipient.entity;
+            session.userData.taskType = scheduletype.entity;
             next();
         }        
         else{
@@ -106,7 +104,6 @@ intents.matches('createtasks', [
             });    
            
         }
-
     },
 
      function (session, results,next,args) {
@@ -122,6 +119,82 @@ intents.matches('createtasks', [
         }
          next();
     },
+
+    function(session,args,next,req,res){
+
+        var scheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'recipient');
+
+        if(scheduleDate){
+            session.userData.taskDate = scheduleDate.entity;
+            next();
+        }        
+        else{
+            session.beginDialog('/missingRecipient',{
+                prompt: "Seems Like there is no date. Who is the date tasks?", 
+                retryPrompt: "Sorry that is incorrect." 
+            });      
+        }
+    },
+
+    function(session,results,next,args){
+
+        if(!session.userData.taskDate){
+            if (results.response) {
+                session.userData.taskDate = results.response;
+                session.send("taskDate is set to %s", results.response);
+            } 
+            else {
+                session.send("too many tries for taskDate");
+            }
+        }
+         next();
+
+    },
+
+
+    function(session,args,next,req,res){
+
+        var schedulePlace = builder.EntityRecognizer.findEntity(session.userData.entities,'place');
+
+        if(schedulePlace){
+            session.userData.taskPlace = schedulePlace.entity;
+            next();
+        }        
+        else{
+            session.beginDialog('/missingTaskPlace',{
+                prompt: "Seems Like there is no place. Where will it happend?", 
+                retryPrompt: "Sorry that is incorrect." 
+            });      
+        }
+    },
+
+    function(session,results,next,args){
+
+        if(!session.userData.taskPlace){
+            if (results.response) {
+                session.userData.taskPlace = results.response;
+                session.send("Place is set to %s", results.response);
+            } 
+            else {
+                session.send("too many tries for taskPlace");
+            }
+        }
+         next();
+
+    },
+
+    function(session,args){
+
+        session.send("Task name: %s, TaskType %s, taskDate %s, task place %s", session.userData.taskName,  session.userData.taskType, session.userData.taskDate, session.userData.taskPlace)
+/*can be a function for reusablitiy function(session){ session.something}*/
+        session.userData.taskName = null;
+        session.userData.taskType = null;
+        session.userData.taskDate = null;
+        session.userData.entities = null;
+        session.userData.taskPlace = null;
+        
+    }
+
 
 
     /*To ADD DATE AND PLACE*/
@@ -172,41 +245,12 @@ bot.dialog('/welcome', [
     }
 ]);
 
-
 bot.dialog('/cannot',[
     function(session){
         session.send('I Cannot Understand what you are saying!');
         session.endDialog();
     }
 ]);
-
-
-/*(bot.dialog('/missingTasks',[
-    function(session){
-        // builder.Prompts.text(session,'I know you are trying to create a task and I cannot identify your task name or I think it`s not provided. Can you tell me What is the name of your Task?');
-        builder.Prompts.text(session,'Missing taskName. Input task name.');
-    },
-    function(session,results,next){
-        //if(results.response){
-
-        //clear previous task name
-        session.userData.taskName = '';
-
-        //assign new
-        session.userData.taskName = results.response;
-        session.userData.taskName = 'static';
-        session.endDialog();
-        //}
-    }    
-]);
-
-*/
-
-
-bot.dialog('/meaningOfLife', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
-    return response;
-}));
-
 
 bot.dialog('/missingTasks', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
     return response !== null;
@@ -219,3 +263,8 @@ bot.dialog('/missingRecipient', builder.DialogAction.validatedPrompt(builder.Pro
 bot.dialog('/missingTaskType', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
     return response !== null;
 }));
+
+bot.dialog('/missingTaskPlace', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
+    return response !== null;
+}));
+
