@@ -24,8 +24,13 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
 
 // Create chat bot
 var connector = new builder.ChatConnector({
+<<<<<<< HEAD
     appId: 'fac1b10a-47f8-4da8-853d-f694ce0a4ec6',
     appPassword: 'cGkmy5TqALJkVhV3DoxgdzO'
+=======
+    appId: '794f97d7-715f-4b3d-b-c06-b11ffd5592f7',
+    appPassword: 'GCF95vFRky7AhnvEEB8k-raM'
+>>>>>>> ErisGitHub/master
 });
 
 var bot = new builder.UniversalBot(connector);
