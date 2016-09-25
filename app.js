@@ -3,14 +3,17 @@ Skuld : Simple Taskbot
 Created by: Jaime R. Canicula
 
 Thanks to Pia Carmela Quizon for helping me on the LUIS
-and the concept of Node.js
+and brushing up with node.js
 
 References : https://docs.botframework.com/en-us/node/builder/guides/examples/
            : https://docs.botframework.com/en-us/node/builder/
+
 */
 
 var restify = require('restify');
 var builder = require('botbuilder');
+var chrono = require('chrono-node');
+
 
 //=========================================================
 // Bot Setup
@@ -38,18 +41,23 @@ server.post('/api/messages', connector.listen());
 var intents = new builder.IntentDialog();
 
 var recognizer = new builder.LuisRecognizer('https://api.projectoxford.ai/luis/v1/application?id=f5eda0a2-2df1-492c-814b-3382dd4d0303&subscription-key=fa7154d93dae4d8196750dc6f1de0201');
+
 var intents = new builder.IntentDialog({ recognizers: [recognizer] });
 
 bot.dialog('/', intents);
 
 
+/*Intent Matching*/
+
+//===============================================
+//Creating a tasks
+// Added : September 26, 2016
+//===============================================||
 intents.matches('createtasks', [
 
     function(session,args,next,req,res){
         /*Initialize the user session*/
         session.userData.newConversation = "initialized";
-
-
 
         /*Store the luis entites to the session to be used in the waterfall*/
         session.userData.entities = args.entities;
@@ -104,7 +112,7 @@ intents.matches('createtasks', [
         else{
 
             session.beginDialog('/missingTaskType',{
-                prompt: "Seems Like there is no task type. Who is the name of your tasks?",
+                prompt: "Seems Like there is no task type. Kindly input it?",
                 retryPrompt: "Sorry that's incorrect. It must not be empty"
             });
 
@@ -116,7 +124,7 @@ intents.matches('createtasks', [
         if(!session.userData.taskType){
             if (results.response) {
                 session.userData.taskType = results.response;
-                session.send("taskType is set to %s",results.response);
+                session.send("Your Task type is set to %s", results.response);
             }
             else {
                 session.send("too many tries for taskType");
@@ -126,17 +134,32 @@ intents.matches('createtasks', [
     },
 
     function(session,args,next,req,res){
+        var scheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
 
-        var scheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'recipient');
-
+        var scheduleDateSpecial = builder.EntityRecognizer.findEntity(session.userData.entities,'date.times');
+       
         if(scheduleDate){
+
             session.userData.taskDate = scheduleDate.entity;
+
+            var x = chrono.parseDate(scheduleDate.entity);
+
+            session.userData.taskDate = x;
+
+            next();
+        }
+        else if(scheduleDateSpecial){
+            //session.userData.taskDate =  chrono.parseDate(scheduleDateSpecial); 
+            var x = chrono.parseDate(scheduleDateSpecial.entity);
+
+            session.userData.taskDate = x;
+
             next();
         }
         else{
             session.beginDialog('/missingRecipient',{
-                prompt: "Seems Like there is no date. Who is the date tasks?",
-                retryPrompt: "Sorry that is incorrect."
+                prompt: "Seems Like there is no date. When will this happend?",
+                retryPrompt: "Sorry that is incorrect. Enter a better format."
             });
         }
     },
@@ -145,15 +168,15 @@ intents.matches('createtasks', [
 
         if(!session.userData.taskDate){
             if (results.response) {
-                session.userData.taskDate = results.response;
-                session.send("taskDate is set to %s", results.response);
+                var y = chrono.parseDate(results.response);
+                session.userData.taskDate = y;
             }
             else {
                 session.send("too many tries for taskDate");
             }
         }
-         next();
 
+        next();
     },
 
 
@@ -191,7 +214,7 @@ intents.matches('createtasks', [
     function(session,args){
 
         session.send("Task name: %s, TaskType %s, taskDate %s, task place %s", session.userData.taskName,  session.userData.taskType, session.userData.taskDate, session.userData.taskPlace)
-/*can be a function for reusablitiy function(session){ session.something}*/
+        /*can be a function for reusablitiy function(session){ session.something}*/
         session.userData.taskName = null;
         session.userData.taskType = null;
         session.userData.taskDate = null;
@@ -241,27 +264,37 @@ intents.matches('deletetasks', [
 
         /*Taks Name Definition*/
         var deleteTaskName = builder.EntityRecognizer.findEntity(session.userData.entities,'taskname');
+        var deleteTaskall = builder.EntityRecognizer.findEntity(session.userData.entities,'all');
 
         if(deleteTaskName){
             /*if there is a taskName store it to the session.userData*/
             session.userData.deleteTaskName = deleteTaskName.entity;
+            if(deleteTaskall){
+                session.userData.deleteAllTask= deleteTaskall.entity;
+                session.send(session.userData.deleteTaskall + " DELETE ALL SOMETHING INVOKED");
+            }
+           
             next();
         }
         /*Create a new dialog if deleteTaskName Is Missing*/
         else{
-
-            session.beginDialog('/missingDeleteTaskName',{
-                prompt: "Seems Like I can't see the taskname, would you enter the name of the task to be deleted?",
-                retryPrompt: "Sorry that's incorrect. It must not be empty"
-            });
+            if(deleteTaskall){
+                next(); 
+                session.userData.deleteAllTask = deleteTaskall.entity;
+            }
+            else{
+                session.beginDialog('/missingDeleteTaskName',{
+                    prompt: "Seems Like I can't see the taskname, would you enter the name of the task to be deleted?",
+                    retryPrompt: "Sorry that's incorrect. It must not be empty"
+                });
+            }
         }
 
     },
 
     function (session, results,next,res,req) {
-
         /*Just for the prompting*/
-        if(!session.userData.deleteTaskName){
+        if(!session.userData.deleteTaskName && !session.userData.deleteTaskall){
             if (results.response) {
                 session.userData.deleteTaskName = results.response;
                 session.send("Task name to delete is set to %s", results.response);
@@ -269,25 +302,24 @@ intents.matches('deletetasks', [
                 session.send("too many tries");
             }
         }
-
         /*waterfall*/
-
         next();
     },
 
 
     function(session,args,next,req,res){
 
-        var deleteScheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'recipient');
-
+        var deleteScheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
+        var deleteScheduleSpecial = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
         if(deleteScheduleDate){
             session.userData.deleteTaskDate = deleteScheduleDate.entity;
+            session.send(deleteScheduleDate.entity+ "built.in.date");
             next();
         }
         else{
             session.beginDialog('/missingDeleteTaskDate',{
                 prompt: "Seems Like there is no date. When is the date of the task?",
-                retryPrompt: "Sorry that is incorrect."
+                retryPrompt: "Sorry that is incorrect. Enter a better format"
             });
         }
     },
@@ -309,6 +341,7 @@ intents.matches('deletetasks', [
 
 
     function(session,args){
+
 
         session.send("Task name to delete: %s, taskDate: %s", session.userData.deleteTaskName,  session.userData.deleteTaskDate);
 
@@ -449,7 +482,7 @@ bot.dialog('/missingTaskName', builder.DialogAction.validatedPrompt(builder.Prom
 }));
 
 bot.dialog('/missingRecipient', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
-    return response !== null;
+    return response !== null && chrono.parseDate(response);
 }));
 
 bot.dialog('/missingTaskType', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {

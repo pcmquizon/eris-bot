@@ -6,6 +6,7 @@
   "dependencies": {
     "body-parser": "^1.14.2",
     "botbuilder": "^3.2.3",
+    "chrono-node": "^1.2.4",
     "cognitive-services": "^0.1.0",
     "express": "^4.13.3",
     "lodash": "^4.9.0",
