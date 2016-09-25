@@ -10,6 +10,7 @@
     "express": "^4.13.3",
     "lodash": "^4.9.0",
     "morgan": "^1.6.1",
+    "mssql": "^3.3.0",
     "restify": "^4.1.1",
     "tedious": "^1.14.0",
     "winston": "^2.1.0"
