@@ -8,6 +8,7 @@ and the concept of Node.js
 References : https://docs.botframework.com/en-us/node/builder/guides/examples/
            : https://docs.botframework.com/en-us/node/builder/
 */
+
 var restify = require('restify');
 var builder = require('botbuilder');
 
@@ -23,9 +24,10 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
 
 // Create chat bot
 var connector = new builder.ChatConnector({
-    appId: process.env.MICROSOFT_APP_ID,
-    appPassword: process.env.MICROSOFT_APP_PASSWORD
+    appId: '794f97d7-715f-4b3d-b-c06-b11ffd5592f7',
+    appPassword: 'GCF95vFRky7AhnvEEB8k-raM'
 });
+
 var bot = new builder.UniversalBot(connector);
 server.post('/api/messages', connector.listen());
 
@@ -473,3 +475,85 @@ bot.dialog('/missingListTaskDate', builder.DialogAction.validatedPrompt(builder.
 }));
 
 
+//=========================================================
+// MS SQL
+//=========================================================
+
+var sql = require('mssql');
+
+var config = {
+    user: 'skuld',
+    password: '!July2016',
+    server: 'skuld.database.windows.net',
+    database: 'Skuld',
+
+    options: {
+        encrypt: true // For Windows Azure
+    }
+}
+
+sql.connect(config, function(err) {
+    // ... error checks
+    if(err){
+        console.log('CONNECTION error: '+err);
+    }
+
+    var request = new sql.Request();
+
+    //=========================================================
+    // apparently MS SQL *hates* double quotes,
+    // this applies to all operations (select, update, delete), not just insert
+
+    // for each string you will use, escape the single quotes you'll be using
+    // e.g. insert into table_name(table_column) values(\'some value\');'
+
+    // another option is to use variables in this format:
+    //  var foo = "'some value'";
+    // then use it in the query string like this
+    //  'insert into table_name(table_column) values('+ foo +');'
+    //=========================================================
+
+    // create / insert
+    request.query('insert into Tasks(TaskName) values(\'jaime2\');', function(err, recordset) {
+        // ... error checks
+        if(err){
+            console.log('DB error: '+err);
+        }
+
+        console.log(recordset);
+    });
+
+
+    // retrieve / select
+    request.query('select * from TrainingData', function(err, recordset) {
+        // ... error checks
+        if(err){
+            console.log('DB error: '+err);
+        }
+
+        console.log(recordset);
+    });
+
+
+    // update
+    request.query('update Tasks set TaskName=\'modified_jaime3\' where TaskName=\'jaime3\'', function(err, recordset) {
+        // ... error checks
+        if(err){
+            console.log('DB error: '+err);
+        }
+
+        console.log(recordset);
+    });
+
+
+    // delete
+    request.query('delete from Tasks where TaskName=\'jaime2\'', function(err, recordset) {
+        // ... error checks
+        if(err){
+            console.log('DB error: '+err);
+        }
+
+        console.log(recordset);
+    });
+
+});
