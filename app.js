@@ -166,7 +166,6 @@ intents.matches('createtasks', [
         } 
 
         if(scheduleDate && valid){
-
             session.userData.taskDate = scheduleDate.entity;
             var x = chrono.parseDate(scheduleDate.entity);
             session.userData.taskDate = x;
@@ -205,7 +204,7 @@ intents.matches('createtasks', [
                  else{
                     session.send ("Invalid date");
                  }
-           } 
+            } 
             else {
                 session.userData.invalid = true;
                 session.send('To many tries. This will now be invalid');
@@ -360,8 +359,44 @@ intents.matches('deletetasks', [
 
     function(session,args,next,req,res){
 
+
         var deleteScheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
-        var deleteScheduleSpecial = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
+
+        var deleteScheduleSpecial = builder.EntityRecognizer.findEntity(session.userData.entities,'date.times');
+       
+        var todaysDate = chrono.parseDate('today');
+       
+        if(deleteScheduleDate){
+            
+            var inputDate = chrono.parseDate(deleteScheduleDate.entity);
+
+            if(new Date (inputDate) >= new Date(todaysDate)){
+                    var valid = true;
+            }
+        }
+        
+        else if(deleteScheduleSpecial){
+            var inputDateSpecial = chrono.parseDate(deleteScheduleSpecial.entity);
+      
+            if(new Date (inputDateSpecial) >= new Date(todaysDate)){
+                var valid = true;
+            }
+        } 
+
+        if(deleteScheduleDate && valid){
+            session.userData.deleteTaskDate = scheduleDate.entity;
+            var x = chrono.parseDate(scheduleDate.entity);
+            session.userData.deleteTaskDate = x;
+            next();
+        }
+        else if(deleteScheduleSpecial && valid){
+            //session.userData.deleteTaskDate =  chrono.parseDate(scheduleDateSpecial); 
+            var x = chrono.parseDate(scheduleDateSpecial.entity);
+            session.userData.deleteTaskDate = x;
+            next();
+        }
+
+        /*
         if(deleteScheduleDate){
 
             var x = chrono.parse(deleteScheduleDate.entity);
@@ -377,9 +412,10 @@ intents.matches('deletetasks', [
             session.send(x + "Deletion Date");
             
         }
+        */
         else{
             session.beginDialog('/missingDeleteTaskDate',{
-                prompt: "Seems Like there is no date. When is the date of the task?",
+                prompt: "Seems like there is no date or the date you entered is in the past. Don't look back. When is the date of the task?",
                 retryPrompt: "Sorry that is incorrect. Enter a better format"
             });
         }
@@ -389,11 +425,25 @@ intents.matches('deletetasks', [
 
         if(!session.userData.deleteTaskDate){
             if (results.response) {
-                 var y = chrono.parseDate(results.response);
-                session.userData.deleteTaskDate = y;
-            }
+                var y = chrono.parseDate(results.response);
+                var t = chrono.parseDate('today');
+             //console.log("Hello world");
+             //console.log("Input: " + new Date(y)); 
+             //console.log("Today: " + new Date(t));
+                if(new Date(y) >= new Date(t)){
+                    console.log(new Date(y) > Date(t));
+                    //console.log("Your Input:" + new Date(y));
+                    //console.log("Today:" + new Date(t));
+                    session.userData.deleteTaskDate = new Date(y);
+                 }
+
+                 else{
+                    session.send ("Invalid date");
+                 }
+            } 
             else {
-                session.send("too many tries for taskDate");
+                session.userData.invalid = true;
+                session.send('To many tries. This will now be invalid');
             }
         }
          next();
@@ -406,7 +456,7 @@ intents.matches('deletetasks', [
 
         session.send("Task name to delete: %s, taskDate: %s", session.userData.deleteTaskName,  session.userData.deleteTaskDate);
         /*can be a function for reusablitiy function(session){ session.something}*/
-        if(session.userData.deleteTaskName &&  session.userData.deleteTaskDate){
+        if(session.userData.deleteTaskName &&  session.userData.deleteTaskDate && !session.userData.invalid){
                 session.beginDialog('/deleteResponse',{
                 prompt: "Do you wanna delete it? (Yes/No)",
                 retryPrompt: "Sorry that is incorrect. Enter a better format"
@@ -421,9 +471,15 @@ intents.matches('deletetasks', [
         */
 
         else{     
+            
+            session.send("Query Invalid");   
             session.userData.deleteTaskName = null;
             session.userData.deleteTaskDate = null;
             session.userData.entities = null;
+            session.userData.all = null;
+            session.userData.deleteResponse = null;
+            session.userData.invalid  = null;
+     
         }
     },
      function(session,results,args){
@@ -440,14 +496,15 @@ intents.matches('deletetasks', [
                 }
             }
             else {
-                session.send("too many tries for taskDate");
+                session.send("Something went wrong dude!");
             }
         }
         session.userData.deleteTaskName = null;
         session.userData.deleteTaskDate = null;
         session.userData.entities = null;
+        session.userData.all = null;
         session.userData.deleteResponse = null;
-        
+        session.userData.invalid  = null;
     }
 ]);
 
@@ -500,7 +557,7 @@ intents.matches('showtasks', [
 
     function(session,args,next,req,res){
 
-        var listScheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'recipient');
+        var listScheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
 
         if(listScheduleDate){
             session.userData.listTaskDate = listScheduleDate.entity;
