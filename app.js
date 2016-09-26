@@ -8,6 +8,8 @@ and brushing up with node.js
 References : https://docs.botframework.com/en-us/node/builder/guides/examples/
            : https://docs.botframework.com/en-us/node/builder/
 
+           + session.message.address.user.id = for deployment unique id
+           + session.message.address.user.name = unique name;
 */
 
 var restify = require('restify');
@@ -27,8 +29,11 @@ server.listen(process.env.port || process.env.PORT || 3978, function () {
 
 // Create chat bot
 var connector = new builder.ChatConnector({
-    appId: 'fac1b10a-47f8-4da8-853d-f694ce0a4ec6',
-    appPassword: 'cGkmy5TqALJkVhV3DoxgdzO'
+    //appId: 'fac1b10a-47f8-4da8-853d-f694ce0a4ec6',
+    //appPassword: 'cGkmy5TqALJkVhV3DoxgdzO'
+
+    appId: '',
+    appPassword: '' 
 });
 
 var bot = new builder.UniversalBot(connector);
@@ -112,7 +117,7 @@ intents.matches('createtasks', [
         else{
 
             session.beginDialog('/missingTaskType',{
-                prompt: "Seems Like there is no task type. Kindly input it?",
+                prompt: "Seems Like there is no task type. Kindly input it",
                 retryPrompt: "Sorry that's incorrect. It must not be empty"
             });
 
@@ -134,31 +139,48 @@ intents.matches('createtasks', [
     },
 
     function(session,args,next,req,res){
+
         var scheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
 
         var scheduleDateSpecial = builder.EntityRecognizer.findEntity(session.userData.entities,'date.times');
        
+        var todaysDate = chrono.parseDate('today');
+       
+        /*to be put in a function*/
         if(scheduleDate){
+            
+            var inputDate = chrono.parseDate(scheduleDate.entity);
+
+            if(new Date (inputDate) >= new Date(todaysDate)){
+                    var valid = true;
+            }
+        }
+        
+        else if(scheduleDateSpecial){
+            var inputDateSpecial = chrono.parseDate(scheduleDateSpecial.entity);
+      
+            if(new Date (inputDateSpecial) >= new Date(todaysDate)){
+                var valid = true;
+
+            }
+        } 
+
+        if(scheduleDate && valid){
 
             session.userData.taskDate = scheduleDate.entity;
-
             var x = chrono.parseDate(scheduleDate.entity);
-
             session.userData.taskDate = x;
-
             next();
         }
-        else if(scheduleDateSpecial){
+        else if(scheduleDateSpecial && valid){
             //session.userData.taskDate =  chrono.parseDate(scheduleDateSpecial); 
             var x = chrono.parseDate(scheduleDateSpecial.entity);
-
             session.userData.taskDate = x;
-
             next();
         }
         else{
             session.beginDialog('/missingRecipient',{
-                prompt: "Seems Like there is no date. When will this happend?",
+                prompt: "Seems like I can't see your date or your date is not . What's the schedule's date?",
                 retryPrompt: "Sorry that is incorrect. Enter a better format."
             });
         }
@@ -169,10 +191,24 @@ intents.matches('createtasks', [
         if(!session.userData.taskDate){
             if (results.response) {
                 var y = chrono.parseDate(results.response);
-                session.userData.taskDate = y;
-            }
+                var t = chrono.parseDate('today');
+             //console.log("Hello world");
+             //console.log("Input: " + new Date(y)); 
+             //console.log("Today: " + new Date(t));
+                if(new Date(y) >= new Date(t)){
+                    console.log(new Date(y) > Date(t));
+                    //console.log("Your Input:" + new Date(y));
+                    //console.log("Today:" + new Date(t));
+                    session.userData.taskDate = new Date(y);
+                 }
+
+                 else{
+                    session.send ("Invalid date");
+                 }
+           } 
             else {
-                session.send("too many tries for taskDate");
+                session.userData.invalid = true;
+                session.send('To many tries. This will now be invalid');
             }
         }
 
@@ -184,13 +220,17 @@ intents.matches('createtasks', [
 
         var schedulePlace = builder.EntityRecognizer.findEntity(session.userData.entities,'place');
 
-        if(schedulePlace){
+        if(session.userData.invalid){
+
+            next();
+        }
+        else if(schedulePlace){
             session.userData.taskPlace = schedulePlace.entity;
             next();
         }
         else{
             session.beginDialog('/missingTaskPlace',{
-                prompt: "Seems Like there is no place. Where will it happend?",
+                prompt: "Seems Like there is no place. Where will this be happening?",
                 retryPrompt: "Sorry that is incorrect."
             });
         }
@@ -211,45 +251,57 @@ intents.matches('createtasks', [
 
     },
 
-    function(session,args){
+    function(session,args,next){
 
         session.send("Task name: %s, TaskType %s, taskDate %s, task place %s", session.userData.taskName,  session.userData.taskType, session.userData.taskDate, session.userData.taskPlace)
         /*can be a function for reusablitiy function(session){ session.something}*/
+        
+        if(session.userData.taskName &&  session.userData.taskDate && session.userData.taskType && !session.userData.invalid){
+                session.beginDialog('/deleteResponse',{
+                prompt: "Are you sure you wanna schedule it? (Yes /or anything if No)",
+                retryPrompt: "Sorry that is incorrect. Enter a better format"
+            });
+        }
+
+        else{
+            session.userData.taskName = null;
+            session.userData.taskType = null;
+            session.userData.taskDate = null;
+            session.userData.entities = null;
+            session.userData.taskPlace = null;
+            session.userData.invalid = null;
+            session.send("Invalid query");
+        }
+    },
+
+    function(session,results,args){
+        if(!session.userData.createResponse){
+            if (results.response) {
+                session.userData.createResponse = results.response;
+                if(results.response ==="Yes" || results.response ==="yes") {
+                    
+                    //call db insert//
+                    session.send("Sucessfully Added");
+                }
+                else{
+
+                    session.send("You Cancelled!");
+                }
+            }
+            else {
+                session.send("Oh no! There's an errrror!");
+            }
+        }
+
         session.userData.taskName = null;
         session.userData.taskType = null;
         session.userData.taskDate = null;
         session.userData.entities = null;
         session.userData.taskPlace = null;
-
+        session.userData.invalid = null;
+        session.userData.createResponse = null;
+        
     }
-
-    /*To do*/
-
-
-    // function(session,args){
-    //     var taskType = builder.EntityRecognizer.findEntity(args.entities,'tasktype');
-
-    //     if(taskType){
-    //         session.send("Hahahaha GOT TASK type");
-    //     }
-    //     else{
-    //        session.beginDialog('/missingTaskType');
-
-    //         //next();
-    //        taskType = session.userData.taskType;
-    //        session.send("Your new Task Name is %s as you mentioned, right?", session.userData.taskType);
-    //     }
-
-    // }
-
-        // var scheduletype = builder.EntityRecognizer.findEntity(args.entities,'scheduletype');
-
-        // if(scheduletype){
-        //     session.send(scheduletype.entity);
-        // }
-        // else{
-        //     session.send("no scheduletype");
-        // }
 ]);
 
 
@@ -284,15 +336,14 @@ intents.matches('deletetasks', [
             }
             else{
                 session.beginDialog('/missingDeleteTaskName',{
-                    prompt: "Seems Like I can't see the taskname, would you enter the name of the task to be deleted?",
+                    prompt: "Seems Like I can't see the task to be deleted in your query, would you enter the name of the task to be deleted?",
                     retryPrompt: "Sorry that's incorrect. It must not be empty"
                 });
             }
         }
-
     },
 
-    function (session, results,next,res,req) {
+    function (session,results,next,res,req) {
         /*Just for the prompting*/
         if(!session.userData.deleteTaskName && !session.userData.deleteTaskall){
             if (results.response) {
@@ -312,9 +363,19 @@ intents.matches('deletetasks', [
         var deleteScheduleDate = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
         var deleteScheduleSpecial = builder.EntityRecognizer.findEntity(session.userData.entities,'builtin.datetime.date');
         if(deleteScheduleDate){
-            session.userData.deleteTaskDate = deleteScheduleDate.entity;
-            session.send(deleteScheduleDate.entity+ "built.in.date");
+
+            var x = chrono.parse(deleteScheduleDate.entity);
+            session.userData.deleteTaskDate = x;
+            session.send(x + "Deletion Date");
+            
             next();
+        }
+        else if(deleteScheduleSpecial){
+
+            var x = chrono.parse(deleteScheduleDate.entity);
+            session.userData.deleteTaskDate = x;
+            session.send(x + "Deletion Date");
+            
         }
         else{
             session.beginDialog('/missingDeleteTaskDate',{
@@ -328,8 +389,8 @@ intents.matches('deletetasks', [
 
         if(!session.userData.deleteTaskDate){
             if (results.response) {
-                session.userData.deleteTaskDate = results.response;
-                session.send("taskDate is set to %s", results.response);
+                 var y = chrono.parseDate(results.response);
+                session.userData.deleteTaskDate = y;
             }
             else {
                 session.send("too many tries for taskDate");
@@ -340,20 +401,54 @@ intents.matches('deletetasks', [
     },
 
 
-    function(session,args){
+    function(session,args,next,req,res){
 
 
         session.send("Task name to delete: %s, taskDate: %s", session.userData.deleteTaskName,  session.userData.deleteTaskDate);
-
         /*can be a function for reusablitiy function(session){ session.something}*/
+        if(session.userData.deleteTaskName &&  session.userData.deleteTaskDate){
+                session.beginDialog('/deleteResponse',{
+                prompt: "Do you wanna delete it? (Yes/No)",
+                retryPrompt: "Sorry that is incorrect. Enter a better format"
+            });
+        }
+
+        /* yung all na cases
+        else if {
+
+            next()
+        }
+        */
+
+        else{     
+            session.userData.deleteTaskName = null;
+            session.userData.deleteTaskDate = null;
+            session.userData.entities = null;
+        }
+    },
+     function(session,results,args){
+        if(!session.userData.deleteResponse){
+            if (results.response) {
+                session.userData.deleteResponse = results.response;
+                if(results.response ==="Yes" || results.response ==="yes") {
+                    
+                    //call db delete//
+                    session.send("Task deleted");
+                }
+                else{
+                    session.send("Task deletion cancelled");
+                }
+            }
+            else {
+                session.send("too many tries for taskDate");
+            }
+        }
         session.userData.deleteTaskName = null;
-        // session.userData.taskType = null;
         session.userData.deleteTaskDate = null;
         session.userData.entities = null;
-        // session.userData.taskPlace = null;
-
+        session.userData.deleteResponse = null;
+        
     }
-
 ]);
 
 
@@ -454,7 +549,7 @@ intents.onDefault([
     function (session, args) {
         if(!session.userData.newConversation){
             session.beginDialog('/welcome');
-            session.send(session.message.address.channelId);
+            session.send("Thanks for using the bot on " + session.message.address.channelId + " Let\'s set your future!");
         }
         else{
             session.beginDialog('/cannot');
@@ -464,7 +559,7 @@ intents.onDefault([
 
 bot.dialog('/welcome', [
     function (session) {
-        session.send('Hi! This is Eris, Your Personal Scheduling Bot');
+        session.send('Hi! ' +session.message.address.user.name+'! This is Skuld, Your Personal Scheduling Bot! Currently, I\'m for training!');
         session.userData.newConversation = "initialized";
         session.endDialog();
     }
@@ -472,7 +567,7 @@ bot.dialog('/welcome', [
 
 bot.dialog('/cannot',[
     function(session){
-        session.send('I Cannot Understand what you are saying!');
+        session.send('I cannot understand what you are saying! I\'m still learning. Teach me! ');
         session.endDialog();
     }
 ]);
@@ -482,7 +577,15 @@ bot.dialog('/missingTaskName', builder.DialogAction.validatedPrompt(builder.Prom
 }));
 
 bot.dialog('/missingRecipient', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
-    return response !== null && chrono.parseDate(response);
+    
+   var inputDate = chrono.parseDate(response);
+   var todaysDate = chrono.parseDate('today');
+
+   if(new Date (inputDate) >= new Date(todaysDate)){
+        var valid = true;
+   }
+
+    return response !== null && chrono.parseDate(response) && valid;
 }));
 
 bot.dialog('/missingTaskType', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
@@ -494,11 +597,20 @@ bot.dialog('/missingTaskPlace', builder.DialogAction.validatedPrompt(builder.Pro
 }));
 
 bot.dialog('/missingDeleteTaskName', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
+
     return response !== null;
 }));
 
 bot.dialog('/missingDeleteTaskDate', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
-    return response !== null;
+
+   var inputDate = chrono.parseDate(response);
+   var todaysDate = chrono.parseDate('today');
+
+   if(new Date (inputDate) >= new Date(todaysDate)){
+        var valid = true;
+   }
+
+    return response !== null && chrono.parseDate(response) && valid;
 }));
 
 bot.dialog('/missingListTaskName', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
@@ -510,85 +622,89 @@ bot.dialog('/missingListTaskDate', builder.DialogAction.validatedPrompt(builder.
 }));
 
 
+bot.dialog('/deleteResponse', builder.DialogAction.validatedPrompt(builder.PromptType.text, function (response) {
+    return response == "Yes" || response == "No" || response == "yes" || response == "no";
+}));
+
 //=========================================================
 // MS SQL
 //=========================================================
 
-var sql = require('mssql');
+// var sql = require('mssql');
 
-var config = {
-    user: 'skuld',
-    password: '!July2016',
-    server: 'skuld.database.windows.net',
-    database: 'Skuld',
+// var config = {
+//     user: 'skuld',
+//     password: '!July2016',
+//     server: 'skuld.database.windows.net',
+//     database: 'Skuld',
 
-    options: {
-        encrypt: true // For Windows Azure
-    }
-}
+//     options: {
+//         encrypt: true // For Windows Azure
+//     }
+// }
 
-sql.connect(config, function(err) {
-    // ... error checks
-    if(err){
-        console.log('CONNECTION error: '+err);
-    }
+// sql.connect(config, function(err) {
+//     // ... error checks
+//     if(err){
+//         console.log('CONNECTION error: '+err);
+//     }
 
-    var request = new sql.Request();
+//     var request = new sql.Request();
 
-    //=========================================================
-    // apparently MS SQL *hates* double quotes,
-    // this applies to all operations (select, update, delete), not just insert
+//     //=========================================================
+//     // apparently MS SQL *hates* double quotes,
+//     // this applies to all operations (select, update, delete), not just insert
 
-    // for each string you will use, escape the single quotes you'll be using
-    // e.g. insert into table_name(table_column) values(\'some value\');'
+//     // for each string you will use, escape the single quotes you'll be using
+//     // e.g. insert into table_name(table_column) values(\'some value\');'
 
-    // another option is to use variables in this format:
-    //  var foo = "'some value'";
-    // then use it in the query string like this
-    //  'insert into table_name(table_column) values('+ foo +');'
-    //=========================================================
+//     // another option is to use variables in this format:
+//     //  var foo = "'some value'";
+//     // then use it in the query string like this
+//     //  'insert into table_name(table_column) values('+ foo +');'
+//     //=========================================================
 
-    // create / insert
-    request.query('insert into Tasks(TaskName) values(\'test insert\');', function(err, recordset) {
-        // ... error checks
-        if(err){
-            console.log('DB error: '+err);
-        }
+//     // create / insert
+//     request.query('insert into Tasks(TaskName) values(\'test insert\');', function(err, recordset) {
+//         // ... error checks
+//         if(err){
+//             console.log('DB error: '+err);
+//         }
 
-        console.log(recordset);
-    });
-
-
-    // retrieve / select
-    request.query('select * from TrainingData', function(err, recordset) {
-        // ... error checks
-        if(err){
-            console.log('DB error: '+err);
-        }
-
-        console.log(recordset);
-    });
+//         console.log(recordset);
+//     });
 
 
-    // update
-    request.query('update Tasks set TaskName=\'test update\' where TaskName=\'modified_jaime3\'', function(err, recordset) {
-        // ... error checks
-        if(err){
-            console.log('DB error: '+err);
-        }
+//     // retrieve / select
+//     request.query('select * from TrainingData', function(err, recordset) {
+//         // ... error checks
+//         if(err){
+//             console.log('DB error: '+err);
+//         }
 
-        console.log(recordset);
-    });
+//         console.log(recordset);
+//     });
 
 
-    // delete
-    request.query('delete from Tasks where TaskName=\'jaime\'', function(err, recordset) {
-        // ... error checks
-        if(err){
-            console.log('DB error: '+err);
-        }
+//     // update
+//     request.query('update Tasks set TaskName=\'test update\' where TaskName=\'modified_jaime3\'', function(err, recordset) {
+//         // ... error checks
+//         if(err){
+//             console.log('DB error: '+err);
+//         }
 
-        console.log(recordset);
-    });
+//         console.log(recordset);
+//     });
 
-});
+
+//     // delete
+//     request.query('delete from Tasks where TaskName=\'jaime\'', function(err, recordset) {
+//         // ... error checks
+//         if(err){
+//             console.log('DB error: '+err);
+//         }
+
+//         console.log(recordset);
+//     });
+
+// });
